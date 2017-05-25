@@ -38,24 +38,44 @@ def setOfWords2Vec(vocabList, inputSet):
     return returnVec
 
 def trainNB0(trainMatrix,trainCategory):
+    """
+    :param trainMatrix:
+    [
+        [1,0,...],
+        [0,1,...]
+    ]
+    :param trainCategory:
+    [1,0,...]
+    :return:
+    """
     numTrainDocs = len(trainMatrix)
     numWords = len(trainMatrix[0])
+    # 不和谐文档的概率
     pAbusive = sum(trainCategory)/float(numTrainDocs)
-    p0Num = ones(numWords); p1Num = ones(numWords)      #change to ones() 
-    p0Denom = 2.0; p1Denom = 2.0                        #change to 2.0
+    # 每个词出现的次数初始化为1，防止后面计算p(x1|c)p(x2|c)...p(xn|c)的时候为0
+    p0Num = ones(numWords); p1Num = ones(numWords)
+    p0Denom = 2.0; p1Denom = 2.0
     for i in range(numTrainDocs):
         if trainCategory[i] == 1:
+            # 向量和，统计类比1下每个词的总数
             p1Num += trainMatrix[i]
+            # 得到类别1下的总次数
             p1Denom += sum(trainMatrix[i])
         else:
             p0Num += trainMatrix[i]
             p0Denom += sum(trainMatrix[i])
-    p1Vect = log(p1Num/p1Denom)          #change to log()
-    p0Vect = log(p0Num/p0Denom)          #change to log()
+    # 避免p(x1|c)p(x2|c)...p(xn|c)得到很小的数最后四舍五入为0
+    p1Vect = log(p1Num/p1Denom)
+    p0Vect = log(p0Num/p0Denom)
+    # 返回p(w|0) p(w|1) p(1) 这里w是向量
     return p0Vect,p1Vect,pAbusive
 
 def classifyNB(vec2Classify, p0Vec, p1Vec, pClass1):
-    p1 = sum(vec2Classify * p1Vec) + log(pClass1)    #element-wise mult
+    # vec2Classify * p1Vec
+    # [1,0,...] * [-3.1122,-2.122,...]
+    # 为什么是求和，因为已经转为了对数
+    # log(p(w|c)p(c)) = log(p(w|c)) + log(p(c))
+    p1 = sum(vec2Classify * p1Vec) + log(pClass1)
     p0 = sum(vec2Classify * p0Vec) + log(1.0 - pClass1)
     if p1 > p0:
         return 1
@@ -83,7 +103,10 @@ def testingNB():
     thisDoc = array(setOfWords2Vec(myVocabList, testEntry))
     print testEntry,'classified as: ',classifyNB(thisDoc,p0V,p1V,pAb)
 
-def textParse(bigString):    #input is big string, #output is word list
+def textParse(bigString):
+    """
+    字符串转为词向量
+    """
     import re
     listOfTokens = re.split(r'\W*', bigString)
     return [tok.lower() for tok in listOfTokens if len(tok) > 2] 
@@ -91,27 +114,33 @@ def textParse(bigString):    #input is big string, #output is word list
 def spamTest():
     docList=[]; classList = []; fullText =[]
     for i in range(1,26):
+        # 垃圾邮件
         wordList = textParse(open('email/spam/%d.txt' % i).read())
         docList.append(wordList)
         fullText.extend(wordList)
         classList.append(1)
+        # 正常邮件
         wordList = textParse(open('email/ham/%d.txt' % i).read())
         docList.append(wordList)
         fullText.extend(wordList)
         classList.append(0)
-    vocabList = createVocabList(docList)#create vocabulary
-    trainingSet = range(50); testSet=[]           #create test set
+    # 词典
+    vocabList = createVocabList(docList)
+    trainingSet = range(50); testSet=[]
+    # 随机抽出测试文章索引号
     for i in range(10):
         randIndex = int(random.uniform(0,len(trainingSet)))
         testSet.append(trainingSet[randIndex])
-        del(trainingSet[randIndex])  
+        del(trainingSet[randIndex])
+    # 得到词的条件概率
     trainMat=[]; trainClasses = []
-    for docIndex in trainingSet:#train the classifier (get probs) trainNB0
+    for docIndex in trainingSet:
         trainMat.append(bagOfWords2VecMN(vocabList, docList[docIndex]))
         trainClasses.append(classList[docIndex])
     p0V,p1V,pSpam = trainNB0(array(trainMat),array(trainClasses))
     errorCount = 0
-    for docIndex in testSet:        #classify the remaining items
+    # 测试
+    for docIndex in testSet:
         wordVector = bagOfWords2VecMN(vocabList, docList[docIndex])
         if classifyNB(array(wordVector),p0V,p1V,pSpam) != classList[docIndex]:
             errorCount += 1
